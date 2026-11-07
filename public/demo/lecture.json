@@ -1,0 +1,59 @@
+{
+  "id": "demo-lecture",
+  "title": "Lecture 3: Supply, Demand and Market Equilibrium",
+  "mainIdeas": [
+    "Prices come from the interaction of buyers' demand and sellers' supply.",
+    "Markets move toward the price where quantity demanded equals quantity supplied.",
+    "Shifts in demand or supply change the equilibrium price and quantity."
+  ],
+  "concepts": [
+    {
+      "id": "c1",
+      "name": "Law of demand",
+      "explanation": "Holding everything else constant, when the price of a good rises, the quantity buyers want falls. The demand curve slopes downward because higher prices push buyers toward substitutes and stretch their budgets.",
+      "pages": [3, 4],
+      "misconception": "Thinking a higher price lowers demand, when it lowers quantity demanded. The curve itself does not move.",
+      "bridge": "Raise ticket prices for a derby and fewer fans buy seats. Same fans, same love for the club, just fewer tickets at that price."
+    },
+    {
+      "id": "c2",
+      "name": "Law of supply",
+      "explanation": "Holding everything else constant, when the price of a good rises, sellers offer more of it. Higher prices make extra production profitable, so the supply curve slopes upward.",
+      "pages": [5],
+      "misconception": "Assuming supply means the amount actually sold, rather than what sellers are willing to offer at each price.",
+      "bridge": "If shirt sales pay more, your startup would print more shirts. Higher margin, more effort put into supplying."
+    },
+    {
+      "id": "c3",
+      "name": "Market equilibrium",
+      "explanation": "Equilibrium is the price where quantity demanded equals quantity supplied. At that price there is no pressure for the price to change, and the market clears.",
+      "pages": [6, 7],
+      "misconception": "Believing equilibrium is a fair or ideal price, rather than just the price where the two quantities match.",
+      "bridge": "Like a transfer fee that both clubs finally accept: not fair, just the point where buyer and seller stop moving."
+    },
+    {
+      "id": "c4",
+      "name": "Shortage and surplus",
+      "explanation": "Below equilibrium, quantity demanded exceeds quantity supplied: a shortage, which pushes prices up. Above equilibrium, quantity supplied exceeds quantity demanded: a surplus, which pushes prices down.",
+      "pages": [8, 9],
+      "misconception": "Thinking a shortage means the good is rare, when it means the price is set too low.",
+      "bridge": "Final tickets sold too cheap sell out in minutes and touts appear. That's a shortage created by the price, not by the stadium."
+    },
+    {
+      "id": "c5",
+      "name": "Shift vs movement along a curve",
+      "explanation": "A change in the good's own price causes a movement along the curve. A change in anything else, like income, tastes or input costs, shifts the whole curve.",
+      "pages": [10, 11],
+      "misconception": "Saying a price change shifts the demand curve. Price only moves you along it.",
+      "bridge": "A star signing makes fans want more shirts at every price: the curve shifts. A discount just moves fans along the same curve."
+    },
+    {
+      "id": "c6",
+      "name": "Effects of a demand shift on equilibrium",
+      "explanation": "When demand increases with supply unchanged, both equilibrium price and quantity rise. When demand falls, both fall. The new equilibrium is where the new demand curve crosses supply.",
+      "pages": [12, 13],
+      "misconception": "Expecting price to rise but quantity to stay the same, forgetting sellers respond to the higher price.",
+      "bridge": "Your club reaches the final, demand for your merch jumps, you charge more and print more. Price and quantity rise together."
+    }
+  ]
+}
