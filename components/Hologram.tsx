@@ -11,9 +11,10 @@ import type { MentorId } from "@/lib/types";
 // Drop a CC0 / CC-BY head into public/models and set its path here.
 // Without one, a stylised bust is built from primitives.
 const MODEL_URLS: Record<MentorId, string | null> = {
-  coach: null,
-  founder: null,
-  scientist: null,
+  stickler: null,
+  chill: null,
+  philosopher: null,
+  enthusiast: null,
 };
 
 type Props = {
@@ -38,7 +39,7 @@ export default function Hologram(props: Props) {
 
   return (
     <Canvas camera={{ position: [0, 0, 3.1], fov: 40 }} dpr={[1, 1.5]} gl={{ antialias: false }}>
-      <color attach="background" args={["#05060a"]} />
+      <color attach="background" args={["#0c1210"]} />
       <Driver {...props} levels={levels} />
       <Float speed={1.2} rotationIntensity={0.2} floatIntensity={0.4}>
         <Suspense fallback={null}>
@@ -46,7 +47,6 @@ export default function Hologram(props: Props) {
         </Suspense>
       </Float>
       <Projector accent={props.accent} levels={levels} />
-      <Sparkles count={60} scale={[1.5, 2, 1.5]} position={[0, -0.2, 0]} size={2} speed={0.4} color={props.accent} opacity={0.7} />
       <Burst accent={props.accent} levels={levels} />
       <EffectComposer>
         <Bloom intensity={1.4} luminanceThreshold={0.1} mipmapBlur />
@@ -236,42 +236,55 @@ function PrimitiveBust(props: BustProps) {
 
 // One small prop per mentor so the heads read differently at a glance.
 function MentorProp({ mentor, material }: { mentor: MentorId; material: THREE.Material }) {
-  if (mentor === "scientist") {
+  if (mentor === "stickler") {
+    // thin glasses
     return (
       <group position={[0, 0.25, 0.31]}>
         <mesh material={material} position={[-0.1, 0, 0]}>
-          <torusGeometry args={[0.055, 0.006, 8, 32]} />
+          <torusGeometry args={[0.05, 0.005, 8, 4]} />
         </mesh>
         <mesh material={material} position={[0.1, 0, 0]}>
-          <torusGeometry args={[0.055, 0.006, 8, 32]} />
+          <torusGeometry args={[0.05, 0.005, 8, 4]} />
         </mesh>
         <mesh material={material} rotation={[0, 0, Math.PI / 2]}>
-          <cylinderGeometry args={[0.004, 0.004, 0.09, 6]} />
+          <cylinderGeometry args={[0.004, 0.004, 0.1, 6]} />
         </mesh>
       </group>
     );
   }
-  if (mentor === "coach") {
-    // headset mic
+  if (mentor === "philosopher") {
+    // pointed beard
     return (
-      <group>
-        <mesh material={material} position={[0, 0.24, 0]} rotation={[0, 0, 0]}>
-          <torusGeometry args={[0.31, 0.008, 8, 48, Math.PI]} />
+      <mesh material={material} position={[0, -0.08, 0.2]} rotation={[Math.PI + 0.35, 0, 0]}>
+        <coneGeometry args={[0.1, 0.22, 24, 1, true]} />
+      </mesh>
+    );
+  }
+  if (mentor === "chill") {
+    // headphones resting around the neck
+    return (
+      <group position={[0, -0.22, 0.02]} rotation={[Math.PI / 2 - 0.2, 0, 0]}>
+        <mesh material={material}>
+          <torusGeometry args={[0.17, 0.012, 8, 48, Math.PI * 1.3]} />
         </mesh>
-        <mesh material={material} position={[-0.25, 0.08, 0.14]} rotation={[0.2, -0.9, 0.5]}>
-          <cylinderGeometry args={[0.006, 0.006, 0.26, 6]} />
+        <mesh material={material} position={[-0.17, 0, 0]}>
+          <cylinderGeometry args={[0.045, 0.045, 0.03, 20]} />
         </mesh>
-        <mesh material={material} position={[-0.17, 0.0, 0.25]}>
-          <sphereGeometry args={[0.022, 12, 12]} />
+        <mesh material={material} position={[0.11, 0.13, 0]}>
+          <cylinderGeometry args={[0.045, 0.045, 0.03, 20]} />
         </mesh>
       </group>
     );
   }
-  // founder: open collar
+  // enthusiast: wild hair
   return (
-    <mesh material={material} position={[0, -0.3, 0.02]} rotation={[0.15, 0, 0]}>
-      <torusGeometry args={[0.16, 0.012, 8, 40, Math.PI * 1.4]} />
-    </mesh>
+    <group position={[0, 0.55, -0.02]}>
+      {[-0.16, -0.08, 0, 0.08, 0.16].map((x, i) => (
+        <mesh key={i} material={material} position={[x, 0.02 - Math.abs(x) * 0.4, 0]} rotation={[0, 0, -x * 2.2]}>
+          <coneGeometry args={[0.035, 0.14, 10, 1, true]} />
+        </mesh>
+      ))}
+    </group>
   );
 }
 

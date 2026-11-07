@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import {
   ConversationProvider,
   useConversationControls,
+  useConversationInput,
   useConversationMode,
   useConversationStatus,
 } from "@elevenlabs/react";
-import { MENTORS, type ConceptMap, type MentorId, type SessionResult, type StudentProfile } from "@/lib/types";
+import { MENTORS, UNIVERSITIES, type ConceptMap, type MentorId, type SessionResult, type StudentProfile } from "@/lib/types";
 
 const Hologram = dynamic(() => import("@/components/Hologram"), { ssr: false });
 
 // Must be literal process.env reads so Next inlines them into the client bundle.
 const AGENT_IDS: Record<MentorId, string | undefined> = {
-  coach: process.env.NEXT_PUBLIC_AGENT_COACH_ID,
-  founder: process.env.NEXT_PUBLIC_AGENT_FOUNDER_ID,
-  scientist: process.env.NEXT_PUBLIC_AGENT_SCIENTIST_ID,
+  stickler: process.env.NEXT_PUBLIC_AGENT_STICKLER_ID,
+  chill: process.env.NEXT_PUBLIC_AGENT_CHILL_ID,
+  philosopher: process.env.NEXT_PUBLIC_AGENT_PHILOSOPHER_ID,
+  enthusiast: process.env.NEXT_PUBLIC_AGENT_ENTHUSIAST_ID,
 };
 
 const PROFESSOR_NAME = "Professor Berg";
@@ -45,6 +48,11 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
   const controls = useConversationControls();
   const { status, message } = useConversationStatus();
   const { isSpeaking } = useConversationMode();
+  const { isMuted: micMuted, setMuted: setMicMuted } = useConversationInput();
+  const [volume, setVolume] = useState(0.8);
+  const [speakerMuted, setSpeakerMuted] = useState(false);
+  // Concept the student asked to hear before the session was connected.
+  const pendingExplain = useRef<string | null>(null);
 
   const [conceptId, setConceptId] = useState<string | null>(null);
   const [question, setQuestion] = useState<string | null>(null);
@@ -158,43 +166,77 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
     });
   };
 
+  const connected = status === "connected";
+
+  // Stop button: silence the current turn right away, then tell the agent.
+  // The SDK has no public interrupt, so the rest of the cut-off turn (and the
+  // agent's short acknowledgement) plays muted. Sound comes back once the
+  // agent has been quiet for a moment, or when the student asks for more.
+  const [hushed, setHushed] = useState(false);
+  const speaking = connected && isSpeaking && !hushed;
+
+  // Re-apply on every connect: a new session starts at full volume.
+  useEffect(() => {
+    if (connected) controls.setVolume({ volume: speakerMuted || hushed ? 0 : volume });
+  }, [connected, volume, speakerMuted, hushed, controls]);
+
+  useEffect(() => {
+    if (!hushed || isSpeaking) return;
+    const t = setTimeout(() => setHushed(false), HUSH_MS);
+    return () => clearTimeout(t);
+  }, [hushed, isSpeaking]);
+
+  const stopTalking = () => {
+    if (!connected) return;
+    setHushed(true);
+    // The agent prompt has a rule for this exact token.
+    controls.sendUserMessage("[STOP]");
+  };
+
+  const sendExplain = (id: string) => {
+    const c = conceptMap.concepts.find((x) => x.id === id);
+    if (!c) return;
+    setHushed(false);
+    // The agent prompt has a rule for this exact prefix.
+    controls.sendUserMessage(`[EXPLAIN ${c.id}] Please explain "${c.name}" to me out loud.`);
+  };
+
+  useEffect(() => {
+    if (connected && pendingExplain.current) {
+      sendExplain(pendingExplain.current);
+      pendingExplain.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected]);
+
+  const explain = (id: string) => {
+    if (connected) return sendExplain(id);
+    pendingExplain.current = id;
+    if (status !== "connecting") void start();
+  };
+
   const stop = () => {
     controls.endSession();
     finish();
   };
 
-  const connected = status === "connected";
   const concept = conceptMap.concepts.find((c) => c.id === conceptId) ?? null;
   const stateLabel =
     status === "connecting" ? "Connecting…" : connected ? (isSpeaking ? `${mentor.name} is speaking` : "Listening") : `${mentor.name} is ready`;
 
   return (
-    <div className="fixed inset-0 grid grid-cols-[260px_1fr_320px] grid-rows-[1fr_auto] bg-[#05060a]">
-      {/* Left: concepts with mastery bars */}
-      <aside className="flex flex-col gap-1 overflow-y-auto border-r border-white/5 p-5">
-        <h2 className="mb-3 text-xs uppercase tracking-wider text-white/40">{conceptMap.title}</h2>
-        {conceptMap.concepts.map((c) => {
-          const level = mastery[c.id] ?? 0;
-          const current = c.id === conceptId;
-          return (
-            <div key={c.id} className="rounded-lg px-3 py-2.5 transition-colors" style={{ background: current ? `${accent}14` : "transparent" }}>
-              <div className="mb-2 text-sm" style={{ color: current ? accent : "rgb(255 255 255 / 0.75)" }}>{c.name}</div>
-              <div className="flex gap-1">
-                {[1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="h-1 flex-1 rounded-full transition-colors duration-500"
-                    style={{ background: i <= level ? accent : "rgb(255 255 255 / 0.08)" }}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+    <div className={`classroom fixed inset-0 grid grid-cols-[272px_1fr_minmax(360px,420px)] grid-rows-[1fr_auto]`}>
+
+      {/* Left: the lesson plan, one index card per concept */}
+      <aside className="flex flex-col gap-3 overflow-y-auto px-5 pt-6 pb-8">
+        <h2 className="chalk-display mb-2 text-xl leading-tight text-[var(--chalk)]">{conceptMap.title}</h2>
+        {conceptMap.concepts.map((c, i) => (
+          <IndexCard key={c.id} name={c.name} level={mastery[c.id] ?? 0} current={c.id === conceptId} tilt={i % 2 ? 0.6 : -0.5} accent={accent} />
+        ))}
       </aside>
 
-      {/* Center: the hologram */}
-      <section className="relative">
+      {/* Center: the hologram teacher */}
+      <section className="hologram-stage relative">
         <Hologram
           mentor={profile.mentor}
           accent={accent}
@@ -204,54 +246,114 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
           glitch={glitch}
           celebrate={celebrate}
         />
-        <div className="pointer-events-none absolute inset-x-0 top-6 text-center text-xs uppercase tracking-[0.2em]" style={{ color: `${accent}aa` }}>
+        <div className="pointer-events-none absolute inset-x-0 top-6 flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em]" style={{ color: `${accent}cc` }}>
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent, boxShadow: connected ? `0 0 8px ${accent}` : "none", opacity: connected ? 1 : 0.4 }} />
           {stateLabel}
         </div>
       </section>
 
-      {/* Right: concept card + question card */}
-      <aside className="flex flex-col gap-4 overflow-y-auto border-l border-white/5 p-5">
-        {concept ? (
-          <div className="flex flex-col gap-2 rounded-xl border p-4" style={{ borderColor: `${accent}40` }}>
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-xs uppercase tracking-wider text-white/40">Concept</span>
-              <span className="text-xs text-white/35">p. {concept.pages.join(", ")}</span>
-            </div>
-            <h3 className="text-lg font-medium" style={{ color: accent }}>{concept.name}</h3>
-            <p className="text-sm text-white/55">
-              <span style={{ color: accent }}>↳ </span>
-              {concept.bridge}
-            </p>
+      {/* Right: the chalkboard */}
+      <aside className="flex min-h-0 flex-col py-6 pr-6">
+        <div className="board-frame flex min-h-0 flex-1 flex-col">
+          <div className="board relative flex min-h-0 flex-1 flex-col gap-7 overflow-x-hidden overflow-y-auto p-7">
+            {concept ? (
+              <div key={concept.id} className="relative flex flex-col gap-4">
+                <span className="eraser-swipe" aria-hidden="true" />
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="chalk-display text-[1.9rem] leading-[1.1] text-[var(--chalk)]">
+                    <ChalkText text={concept.name} delay={500} hand={accent} />
+                    <ChalkUnderline color={accent} />
+                  </h3>
+                  <span className="chalk-hand mt-1 shrink-0 rounded-[50%] border-2 border-[var(--chalk-faint)] px-2.5 py-0.5 text-sm text-[var(--chalk-dim)]">
+                    p.&nbsp;{concept.pages.join(", ")}
+                  </span>
+                </div>
+                <p className="chalk-hand flex gap-2 text-[1.05rem] leading-snug text-[var(--chalk-dim)]">
+                  <ArrowDoodle />
+                  <span>
+                    <ChalkText text={concept.bridge} delay={500 + concept.name.length * CHALK_MS} hand={accent} />
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => (speaking ? stopTalking() : explain(concept.id))}
+                  aria-label={speaking ? `Stop ${mentor.name} talking` : `Hear ${mentor.name} explain ${concept.name}`}
+                  className="chalk-button chalk-hand group flex items-center gap-3 self-start rounded-full py-1 pr-4 pl-1 text-[1.05rem] text-[var(--chalk)]"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--chalk)] transition-transform group-hover:scale-105">
+                    {speaking ? <StopIcon /> : <PlayIcon />}
+                  </span>
+                  {speaking ? "stop talking" : "explain it to me"}
+                </button>
+              </div>
+            ) : (
+              <p className="chalk-hand text-lg leading-snug text-[var(--chalk-ghost)]">
+                {connected ? `${mentor.name} will open the first concept.` : `Press Start and ${mentor.name} will open the first concept.`}
+              </p>
+            )}
+
+            {question && (
+              <div key={question} className="flex flex-col gap-3 border-t-2 border-dashed border-[var(--chalk-faint)] pt-6">
+                <p className="chalk-hand text-[1.6rem] leading-snug text-[var(--chalk-yellow)]">
+                  <span className="chalk-display chalk mr-2">Q.</span>
+                  <ChalkText text={question} delay={150} hand={accent} />
+                </p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-white/10 p-4 text-sm text-white/30">
-            Your mentor will open the first concept.
-          </div>
-        )}
-        {question && (
-          <div className="flex flex-col gap-2 rounded-xl p-4" style={{ background: `${accent}12` }}>
-            <span className="text-xs uppercase tracking-wider text-white/40">Question</span>
-            <p className="text-base leading-snug">{question}</p>
-          </div>
-        )}
+        </div>
       </aside>
 
-      {/* Bottom: Start / End + professor chips */}
-      <footer className="col-span-3 flex items-center gap-4 border-t border-white/5 px-5 py-4">
+      {/* Bottom: the chalk ledge holding the controls */}
+      <footer className="ledge col-span-3 flex items-center gap-4 px-6 py-3.5">
         {connected || status === "connecting" ? (
-          <button type="button" onClick={stop} className="rounded-full border border-white/15 px-6 py-2.5 text-sm text-white/80 hover:border-white/30">
+          <button type="button" onClick={stop} className="ledge-btn rounded-full px-6 py-2.5 text-sm">
             End session
           </button>
         ) : (
-          <button type="button" onClick={start} className="rounded-full px-6 py-2.5 text-sm font-medium text-black" style={{ background: accent }}>
+          <button
+            type="button"
+            onClick={start}
+            className="rounded-full bg-[var(--chalk)] px-7 py-2.5 text-sm font-semibold text-[#1d2a23] shadow-[0_2px_6px_rgb(0_0_0/0.35)] transition-transform hover:-translate-y-px"
+          >
             Start
           </button>
         )}
-        {(error || (status === "error" && message)) && <span className="text-sm text-red-400">{error ?? message}</span>}
+        {connected && (
+          <button
+            type="button"
+            onClick={stopTalking}
+            disabled={!speaking}
+            aria-label={`Stop ${mentor.name} talking`}
+            className="ledge-btn flex items-center gap-2 rounded-full py-2 pr-4 pl-3 text-sm transition-opacity disabled:opacity-35"
+          >
+            <StopIcon />
+            Stop talking
+          </button>
+        )}
+        {connected && (
+          <VoiceControls
+            accent={accent}
+            micMuted={micMuted}
+            onMic={() => setMicMuted(!micMuted)}
+            volume={volume}
+            speakerMuted={speakerMuted}
+            onSpeaker={() => setSpeakerMuted(!speakerMuted)}
+            onVolume={(v) => {
+              setVolume(v);
+              setSpeakerMuted(v === 0);
+            }}
+          />
+        )}
+        {(error || (status === "error" && message)) && (
+          <span role="alert" className="text-sm text-[#ffb4a8]">
+            {error ?? message}
+          </span>
+        )}
         <div className="ml-auto flex flex-wrap justify-end gap-2">
           {flagged.map((q, i) => (
-            <span key={i} title={q} className="rounded-full border border-white/15 px-3 py-1 text-xs text-white/60">
-              ✓ Sent to your professor
+            <span key={i} title={q} className="sticky-note chalk-hand px-3 py-1 text-sm" style={{ rotate: `${i % 2 ? 1.5 : -1.5}deg` }}>
+              Sent to {PROFESSOR_NAME}
             </span>
           ))}
         </div>
@@ -262,11 +364,14 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
 
 function dynamicVariables(profile: StudentProfile, map: ConceptMap) {
   return {
-    student_name: profile.name,
+    student_name: profile.firstName,
+    full_name: `${profile.firstName} ${profile.lastName}`.trim(),
+    interests: profile.interests.join(", ") || "not given",
+    hobbies: profile.hobbies.join(", ") || "not given",
+    university: profile.university ? UNIVERSITIES[profile.university].name : "not given",
+    programme: profile.programme || "not given",
+    year: profile.level && profile.year ? `${profile.year} year ${profile.level}` : "not given",
     course: profile.course,
-    hobbies: profile.hobbies.join(", "),
-    career_goal: profile.careerGoal,
-    challenge: profile.challenge,
     professor_name: PROFESSOR_NAME,
     material_title: map.title,
     main_ideas: map.mainIdeas.map((m, i) => `${i + 1}. ${m}`).join(" "),
@@ -291,4 +396,281 @@ function thinkingScore(mastery: Record<string, Level>, ownExplanations: number, 
   const levels: number[] = Object.values(mastery);
   const avg = levels.length ? levels.reduce((a, b) => a + b, 0) / levels.length : 0;
   return Math.round(40 * (avg / 3) + (30 * Math.min(ownExplanations, 5)) / 5 + 30 * (1 - Math.min(answerRequests, 5) / 5));
+}
+
+// ---------- Classroom pieces ----------
+
+const CHALK_MS = 32; // per character, roughly handwriting pace
+const HUSH_MS = 1800; // quiet time after Stop before sound comes back
+const PROGRESS_LABELS: Record<Level, string> = { 0: "Not started", 1: "Getting there", 2: "Almost there", 3: "Mastered" };
+
+// Writes text out character by character, like chalk on a board.
+// Screen readers get the full text at once; reduced motion skips the effect.
+function ChalkText({ text, delay = 0, hand }: { text: string; delay?: number; hand?: string }) {
+  const [shown, setShown] = useState(0);
+  const [animate, setAnimate] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setShown(text.length);
+      return;
+    }
+    setAnimate(true);
+    setShown(0);
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const wait = setTimeout(() => {
+      timer = setInterval(() => {
+        setShown((n) => {
+          if (n + 1 >= text.length) clearInterval(timer);
+          return Math.min(n + 1, text.length);
+        });
+      }, CHALK_MS);
+    }, delay);
+    return () => {
+      clearTimeout(wait);
+      clearInterval(timer);
+    };
+  }, [text, delay]);
+
+  const caret = useRef<HTMLSpanElement>(null);
+  const writing = animate && !!hand && shown > 0 && shown < text.length;
+
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true" className="chalk">
+        {text.slice(0, shown)}
+        <span ref={caret} className="inline-block h-[0.9em] w-0" />
+        <span className="invisible">{text.slice(shown)}</span>
+      </span>
+      {writing && <WritingHand caret={caret} color={hand} tick={shown} />}
+    </>
+  );
+}
+
+// The hologram teacher's hand, holding a real stick of chalk, following the
+// end of the line being written. Rendered in a portal so the board's
+// scroll area never clips it.
+function WritingHand({ caret, color, tick }: { caret: React.RefObject<HTMLSpanElement | null>; color: string; tick: number }) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  useLayoutEffect(() => {
+    const r = caret.current?.getBoundingClientRect();
+    if (r) setPos({ x: r.left, y: r.bottom });
+  }, [caret, tick]);
+  if (!pos) return null;
+  return createPortal(
+    <div className="writing-hand" style={{ left: pos.x, top: pos.y, color }} aria-hidden="true">
+      <svg viewBox="0 0 120 140" width="128" height="149">
+        <defs>
+          <filter id="holo-hand" x="-10%" y="-10%" width="120%" height="120%">
+            <feMorphology in="SourceGraphic" operator="erode" radius="1.3" result="inner" />
+            <feComposite in="SourceGraphic" in2="inner" operator="out" result="edge" />
+            <feComponentTransfer in="SourceGraphic" result="body">
+              <feFuncA type="linear" slope="0.2" />
+            </feComponentTransfer>
+            <feMerge>
+              <feMergeNode in="body" />
+              <feMergeNode in="edge" />
+            </feMerge>
+          </filter>
+          <pattern id="holo-scan" width="4" height="4" patternUnits="userSpaceOnUse">
+            <rect width="4" height="1" fill="currentColor" opacity="0.35" />
+          </pattern>
+        </defs>
+        {/* chalk stick: the one solid, physical thing */}
+        <line x1="5" y1="5" x2="33" y2="33" stroke="#f4f1e8" strokeWidth="7" strokeLinecap="round" />
+        <line x1="7" y1="5" x2="33" y2="31" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+        {/* hologram hand */}
+        <g filter="url(#holo-hand)" stroke="currentColor" strokeLinecap="round" fill="currentColor">
+          <line x1="28" y1="22" x2="64" y2="48" strokeWidth="13" />
+          <line x1="22" y1="36" x2="52" y2="68" strokeWidth="12" />
+          <line x1="44" y1="58" x2="76" y2="82" strokeWidth="13" />
+          <line x1="52" y1="72" x2="82" y2="94" strokeWidth="13" />
+          <ellipse cx="74" cy="72" rx="24" ry="28" transform="rotate(-40 74 72)" stroke="none" />
+          <line x1="86" y1="98" x2="112" y2="128" strokeWidth="30" />
+        </g>
+        <g fill="url(#holo-scan)">
+          <ellipse cx="74" cy="72" rx="24" ry="28" transform="rotate(-40 74 72)" />
+          <line x1="86" y1="98" x2="112" y2="128" stroke="url(#holo-scan)" strokeWidth="30" strokeLinecap="round" />
+        </g>
+        {/* cuff */}
+        <line x1="80" y1="112" x2="102" y2="92" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+      </svg>
+    </div>,
+    document.body,
+  );
+}
+
+function ChalkUnderline({ color }: { color: string }) {
+  return (
+    <svg viewBox="0 0 200 10" preserveAspectRatio="none" className="chalk mt-1 block h-2.5 w-3/4" aria-hidden="true">
+      <path d="M2 6 C 40 2, 80 9, 120 5 S 180 3, 198 6" fill="none" stroke={color} strokeWidth="2.6" strokeLinecap="round" className="draw-in" pathLength={1} />
+    </svg>
+  );
+}
+
+function ArrowDoodle() {
+  return (
+    <svg viewBox="0 0 24 24" className="chalk mt-1 h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 3c0 7 2 11 12 11" />
+      <path d="M13 10l4 4-4 4" />
+    </svg>
+  );
+}
+
+function IndexCard({ name, level, current, tilt, accent }: { name: string; level: Level; current: boolean; tilt: number; accent: string }) {
+  return (
+    <div
+      aria-current={current ? "step" : undefined}
+      className="index-card relative px-4 pt-3 pb-2.5 transition-[rotate,translate,box-shadow] duration-500"
+      style={{
+        rotate: `${current ? 0 : tilt}deg`,
+        translate: current ? "8px 0" : "0 0",
+        boxShadow: current ? "0 10px 22px rgb(0 0 0 / 0.5), 0 2px 4px rgb(0 0 0 / 0.3)" : "0 2px 5px rgb(0 0 0 / 0.35)",
+      }}
+    >
+      {current && (
+        <span
+          className="absolute -top-1.5 left-1/2 h-3.5 w-3.5 -translate-x-1/2 rounded-full"
+          style={{ background: `radial-gradient(circle at 35% 30%, #ffffff88 0 20%, ${accent} 45%)`, boxShadow: "0 2px 3px rgb(0 0 0 / 0.45)" }}
+          aria-hidden="true"
+        />
+      )}
+      <div className="chalk-hand -mx-4 mb-2 border-b border-[#d9534f] px-4 pb-1.5 text-[0.98rem] leading-tight text-[#1f2a44]">{name}</div>
+      <div
+        className="flex flex-col gap-1"
+        role="progressbar"
+        aria-label={`${name} progress`}
+        aria-valuemin={0}
+        aria-valuemax={3}
+        aria-valuenow={level}
+        aria-valuetext={PROGRESS_LABELS[level]}
+      >
+        {/* Pencil-drawn track, filled with a highlighter stroke. */}
+        <div className="relative h-2.5 rounded-full border border-[#5b6b8f]/60">
+          <div
+            className="highlighter absolute inset-y-[-1px] left-[-1px] rounded-full transition-[width] duration-700 ease-out"
+            style={{ width: level ? `calc(${(level / 3) * 100}% + 2px)` : 0, background: level === 3 ? "#2747a8" : `${accent}cc` }}
+          />
+        </div>
+        <div className="chalk-hand flex items-center gap-1 text-xs" style={{ color: level === 3 ? "#2747a8" : "#5b6b8f" }}>
+          {level === 3 && (
+            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" aria-hidden="true">
+              <path d="M4 10.5l3.5 3.5L16 5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+          {PROGRESS_LABELS[level]}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VoiceControls(p: {
+  accent: string;
+  micMuted: boolean;
+  onMic: () => void;
+  volume: number;
+  speakerMuted: boolean;
+  onSpeaker: () => void;
+  onVolume: (v: number) => void;
+}) {
+  const shown = p.speakerMuted ? 0 : p.volume;
+  const step = (d: number) => p.onVolume(Math.round(Math.max(0, Math.min(1, shown + d)) * 10) / 10);
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={p.onMic}
+        aria-pressed={p.micMuted}
+        aria-label={p.micMuted ? "Unmute microphone" : "Mute microphone"}
+        title={p.micMuted ? "Unmute mic" : "Mute mic"}
+        className={`ledge-btn flex h-10 w-10 items-center justify-center rounded-full ${p.micMuted ? "is-off" : ""}`}
+      >
+        <MicIcon off={p.micMuted} />
+      </button>
+      <div className="ledge-btn ml-1 flex items-center gap-1 rounded-full px-1.5 py-1">
+        <button
+          type="button"
+          onClick={p.onSpeaker}
+          aria-pressed={p.speakerMuted}
+          aria-label={p.speakerMuted ? "Unmute mentor" : "Mute mentor"}
+          title={p.speakerMuted ? "Unmute mentor" : "Mute mentor"}
+          className={`flex h-8 w-8 items-center justify-center rounded-full ${p.speakerMuted ? "text-[#ffb4a8]" : ""}`}
+        >
+          <SpeakerIcon level={shown} />
+        </button>
+        <button type="button" onClick={() => step(-0.1)} aria-label="Lower volume" className="flex h-8 w-8 items-center justify-center rounded-full opacity-75 hover:opacity-100">
+          <MinusIcon />
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={shown}
+          onChange={(e) => p.onVolume(Number(e.target.value))}
+          aria-label="Mentor volume"
+          className="w-24"
+          style={{ accentColor: p.accent }}
+        />
+        <button type="button" onClick={() => step(0.1)} aria-label="Raise volume" className="flex h-8 w-8 items-center justify-center rounded-full opacity-75 hover:opacity-100">
+          <PlusIcon />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const iconProps = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+function PlayIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" className="chalk ml-0.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7.5 4.8 19 12 7.5 19.2z" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" className="chalk" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" rx="1.5" />
+    </svg>
+  );
+}
+
+function MicIcon({ off }: { off: boolean }) {
+  return (
+    <svg {...iconProps} aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+      {off && <path d="M4 4l16 16" />}
+    </svg>
+  );
+}
+
+function SpeakerIcon({ level }: { level: number }) {
+  return (
+    <svg {...iconProps} aria-hidden="true">
+      <path d="M11 5 6 9H3v6h3l5 4z" />
+      {level === 0 ? <path d="M16 9l5 6M21 9l-5 6" /> : <path d="M15.5 9.5a3.5 3.5 0 0 1 0 5" />}
+      {level > 0.5 && <path d="M18.5 7a7 7 0 0 1 0 10" />}
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg {...iconProps} aria-hidden="true">
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg {...iconProps} aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
 }

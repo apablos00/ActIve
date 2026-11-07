@@ -42,3 +42,6 @@ next-env.d.ts
 
 # obsidian per-user layout
 **/.obsidian/workspace*.json
+
+# impeccable engine binary (re-downloaded on first run)
+.claude/skills/impeccable/scripts/bin/

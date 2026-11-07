@@ -28,7 +28,7 @@ Use only the material. Cite page numbers for every concept.
 3 main ideas, max 20 words each. 5-8 concepts, simplest first.
 Each explanation is max 60 words, from the source only.
 Each misconception is a real trap a student would fall into.
-Each bridge is an accurate analogy from the student's hobbies or career goal. Max 30 words.
+Each bridge is an accurate analogy from the student's academic interests, hobbies or programme. Vary the source across concepts. Max 30 words.
 
 Schema:
 {

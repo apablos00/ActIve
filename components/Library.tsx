@@ -121,7 +121,7 @@ export default function Library({ profile, conceptMap, onLoaded, onStart }: Prop
 
   return (
     <div className="flex w-full max-w-md flex-col gap-6">
-      <h1 className="text-2xl font-medium">What are you studying, {profile.name}?</h1>
+      <h1 className="text-2xl font-medium">What are you studying, {profile.firstName}?</h1>
 
       <button
         type="button"

@@ -1,12 +1,12 @@
-// Creates (or updates) the three Sparring mentor agents in ElevenLabs and
+// Creates (or updates) the four Sparring teacher agents in ElevenLabs and
 // writes their IDs into .env.local. Safe to re-run: existing agents are patched.
 //
-//   npm run setup:agents              all three mentors
-//   npm run setup:agents -- coach     only the Coach
+//   npm run setup:agents                all four teachers
+//   npm run setup:agents -- stickler    only the Stickler
 //   npm run setup:agents -- --voices  list premade voices and exit
 //
 // Optional env: AGENT_LLM (default gemini-2.5-flash),
-// ELEVENLABS_VOICE_COACH / _FOUNDER / _SCIENTIST (voice IDs).
+// ELEVENLABS_VOICE_STICKLER / _CHILL / _PHILOSOPHER / _ENTHUSIAST (voice IDs).
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -19,20 +19,25 @@ const KEY = process.env.ELEVENLABS_API_KEY;
 const LLM = process.env.AGENT_LLM || "gemini-2.5-flash";
 
 const MENTORS = {
-  coach: {
-    name: "Sparring Coach",
-    firstMessage: "{{student_name}}! Final's today: {{material_title}}. Ready for the first play?",
-    voice: { gender: "male", ages: ["middle_aged", "middle aged", "old"] },
+  stickler: {
+    name: "Sparring Stickler",
+    firstMessage: "Good. {{student_name}}. Today: {{material_title}}. We'll be precise. Ready?",
+    voice: { gender: "female", ages: ["middle_aged", "middle aged", "old"] },
   },
-  founder: {
-    name: "Sparring Founder",
-    firstMessage: "{{student_name}}. {{material_title}}. You've got twenty minutes to convince me you get it. Ready?",
-    voice: { gender: "female", ages: ["young", "middle_aged", "middle aged"] },
-  },
-  scientist: {
-    name: "Sparring Scientist",
-    firstMessage: "Hello {{student_name}}. Today we test what you really know about {{material_title}}. Shall we start?",
+  chill: {
+    name: "Sparring Chill One",
+    firstMessage: "Hey {{student_name}}! No stress, we're just chatting about {{material_title}}. Shall we start?",
     voice: { gender: "male", ages: ["young", "middle_aged", "middle aged"] },
+  },
+  philosopher: {
+    name: "Sparring Philosopher",
+    firstMessage: "Hello {{student_name}}. {{material_title}}... there's more in it than it looks. Shall we find out why?",
+    voice: { gender: "male", ages: ["old", "middle_aged", "middle aged"] },
+  },
+  enthusiast: {
+    name: "Sparring Enthusiast",
+    firstMessage: "{{student_name}}! Oh, I love this one: {{material_title}}. Ready? Let's go!",
+    voice: { gender: "female", ages: ["young", "middle_aged", "middle aged"] },
   },
 };
 
@@ -104,10 +109,13 @@ function placeholders() {
   const map = JSON.parse(readFileSync(join(ROOT, "public/demo/lecture.json"), "utf8"));
   return {
     student_name: "Alex",
-    course: "Intro to Microeconomics",
+    full_name: "Alex Hansen",
+    interests: "Economics, Political science",
     hobbies: "Football, Gaming",
-    career_goal: "Start my own company",
-    challenge: 2,
+    university: "University of Oslo",
+    programme: "Economics",
+    year: "1st year Bachelor",
+    course: "Intro to Microeconomics",
     professor_name: "Professor Berg",
     material_title: map.title,
     main_ideas: map.mainIdeas.map((m, i) => `${i + 1}. ${m}`).join(" "),
