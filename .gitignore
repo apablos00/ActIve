@@ -41,4 +41,4 @@ yarn-error.log*
 next-env.d.ts
 
 # obsidian per-user layout
-.obsidian/workspace*.json
+**/.obsidian/workspace*.json
