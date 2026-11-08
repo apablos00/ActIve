@@ -45,3 +45,6 @@ next-env.d.ts
 
 # impeccable engine binary (re-downloaded on first run)
 .claude/skills/impeccable/scripts/bin/
+
+# demo recordings
+/recordings

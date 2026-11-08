@@ -1,5 +1,6 @@
 import { extractText, getDocumentProxy } from "unpdf";
 import { z } from "zod";
+import { parseExpression } from "@/lib/graph";
 import { getQwen, QWEN_MODEL } from "@/lib/qwen";
 import type { ConceptMap } from "@/lib/types";
 
@@ -15,6 +16,18 @@ const ConceptSchema = z.object({
   pages: z.array(z.number().int()).min(1),
   misconception: z.string().min(1),
   bridge: z.string().min(1),
+  graph: z
+    .object({
+      title: z.string().optional(),
+      expression: z.string().min(1),
+      xMin: z.number(),
+      xMax: z.number(),
+      xLabel: z.string().optional(),
+      yLabel: z.string().optional(),
+      markX: z.number().optional(),
+      skier: z.boolean().optional(),
+    })
+    .nullish(),
 });
 
 const ConceptMapSchema = z.object({
@@ -29,13 +42,15 @@ Use only the material. Cite page numbers for every concept.
 Each explanation is max 60 words, from the source only.
 Each misconception is a real trap a student would fall into.
 Each bridge is an accurate analogy from the student's academic interests, hobbies or programme. Vary the source across concepts. Max 30 words.
+Optional graph: for concepts a curve makes visible (functions, slopes, rates, growth, cost, profit), add a graph the board can draw. expression is y in x using + - * / ^ ( ) sqrt exp ln sin cos pi. Ground it in the bridge when you can, e.g. a ski slope's height over distance with skier true. markX draws a tangent. Leave it out when a graph would not help.
 
 Schema:
 {
   "title": string,
   "mainIdeas": [string, string, string],
   "concepts": [
-    { "id": "c1", "name": string, "explanation": string, "pages": number[], "misconception": string, "bridge": string }
+    { "id": "c1", "name": string, "explanation": string, "pages": number[], "misconception": string, "bridge": string,
+      "graph"?: { "title": string, "expression": string, "xMin": number, "xMax": number, "xLabel"?: string, "yLabel"?: string, "markX"?: number, "skier"?: boolean } }
   ]
 }`;
 
@@ -96,8 +111,10 @@ export async function POST(req: Request) {
           id: crypto.randomUUID(),
           title: parsed.data.title,
           mainIdeas: parsed.data.mainIdeas,
-          concepts: parsed.data.concepts.map((c, i) => ({
+          concepts: parsed.data.concepts.map(({ graph, ...c }, i) => ({
             ...c,
+            // Drop graphs the board can't draw.
+            ...(graph && graph.xMax > graph.xMin && parseExpression(graph.expression) && { graph }),
             id: `c${i + 1}`,
             pages: c.pages.filter((p) => p >= 1 && p <= totalPages),
           })),

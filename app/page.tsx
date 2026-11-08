@@ -16,6 +16,7 @@ export default function Page() {
   const [conceptMap, setConceptMap] = useState<ConceptMap | null>(null);
   const [result, setResult] = useState<SessionResult | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [backToTeacher, setBackToTeacher] = useState(false);
 
   useEffect(() => {
     try {
@@ -46,9 +47,18 @@ export default function Page() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6">
-      {step === "onboarding" && <Onboarding initial={profile} onDone={finishOnboarding} />}
+      {step === "onboarding" && <Onboarding initial={profile} startAtTeacher={backToTeacher} onDone={finishOnboarding} />}
       {step === "library" && profile && (
-        <Library profile={profile} conceptMap={conceptMap} onLoaded={loadConceptMap} onStart={() => setStep("session")} />
+        <Library
+          profile={profile}
+          conceptMap={conceptMap}
+          onLoaded={loadConceptMap}
+          onStart={() => setStep("session")}
+          onBack={() => {
+            setBackToTeacher(true);
+            setStep("onboarding");
+          }}
+        />
       )}
       {step === "session" && profile && conceptMap && (
         <Session

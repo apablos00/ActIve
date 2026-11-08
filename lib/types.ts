@@ -3,27 +3,32 @@ export type Step = "onboarding" | "library" | "session" | "summary";
 export type MentorId = "stickler" | "chill" | "philosopher" | "enthusiast";
 
 export const MENTORS: Record<MentorId, { name: string; style: string; accent: string }> = {
+  enthusiast: { name: "The Enthusiast", style: "Loves the subject. “Isn't this wild?!”", accent: "#f59e0b" },
   stickler: { name: "The Stickler", style: "Strict and precise. “Define your terms.”", accent: "#fb7185" },
   chill: { name: "The Chill One", style: "Relaxed and warm. “No stress, walk me through it.”", accent: "#34d399" },
   philosopher: { name: "The Philosopher", style: "Slow and deep. “But why is that true?”", accent: "#a78bfa" },
-  enthusiast: { name: "The Enthusiast", style: "Loves the subject. “Isn't this wild?!”", accent: "#f59e0b" },
 };
 
 // Onboarding choices. Keep them broad and few so picking is quick.
 export const INTERESTS = ["Business and economics", "Politics and society", "Science and tech", "Arts and culture", "Health and psychology", "Law", "Environment"] as const;
-export const HOBBIES = ["Sports", "Music", "Gaming", "Reading", "Film and series", "Food and cooking", "Travel", "Outdoors"] as const;
+export const HOBBIES = ["Sports", "Music", "Gaming", "Reading", "Film and series", "Food and cooking", "Travel", "Outdoors", "Skiing"] as const;
 
 export const UNIVERSITIES = {
   uio: { label: "UiO", name: "University of Oslo" },
   bi: { label: "BI", name: "BI Norwegian Business School" },
   oslomet: { label: "OsloMet", name: "OsloMet, Oslo Metropolitan University" },
   kristiania: { label: "Kristiania", name: "Kristiania University of Applied Sciences" },
+  other: { label: "Other", name: "Your university" },
 } as const;
 export type UniversityId = keyof typeof UNIVERSITIES;
 
-export const PROGRAMMES = ["Business", "Economics", "Law", "Computer science", "Engineering", "Psychology", "Health and nursing", "Social sciences", "Media and communication"] as const;
-export const LEVELS = ["Bachelor", "Master", "PhD"] as const;
-export const YEARS = ["1st", "2nd", "3rd", "4th+"] as const;
+export const PROGRAMMES = ["Business management", "Economics", "Law", "Computer science", "Engineering", "Psychology", "Health and nursing", "Social sciences", "Media and communication"] as const;
+export const LEVELS = ["Bachelor", "Master"] as const;
+// Years count through the whole degree: a Master runs after a 3-year Bachelor.
+export const YEARS_BY_LEVEL: Record<(typeof LEVELS)[number], readonly string[]> = {
+  Bachelor: ["1st", "2nd", "3rd"],
+  Master: ["4th", "5th"],
+};
 
 export type StudentProfile = {
   // 1. Get to know you
@@ -35,7 +40,7 @@ export type StudentProfile = {
   university: UniversityId | "";
   programme: string; // from PROGRAMMES
   level: string; // from LEVELS
-  year: string; // from YEARS
+  year: string; // from YEARS_BY_LEVEL[level]
   course: string; // free text: the course they're studying now
   // 3. Teacher
   mentor: MentorId;
@@ -48,6 +53,20 @@ export type Concept = {
   pages: number[];
   misconception: string; // real trap
   bridge: string; // analogy from hobby or career
+  graph?: Graph; // drawn on the board when the concept opens
+};
+
+// A function graph the board draws in chalk. y is an expression in x,
+// like "120 - 0.3*x^2". markX adds a tangent there; skier rides the curve.
+export type Graph = {
+  title?: string;
+  expression: string;
+  xMin: number;
+  xMax: number;
+  xLabel?: string;
+  yLabel?: string;
+  markX?: number;
+  skier?: boolean;
 };
 
 export type ConceptMap = {

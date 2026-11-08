@@ -1,59 +1,110 @@
 {
   "id": "demo-lecture",
-  "title": "Lecture 3: Supply, Demand and Market Equilibrium",
+  "title": "Lecture 4: Derivatives and Rates of Change",
   "mainIdeas": [
-    "Prices come from the interaction of buyers' demand and sellers' supply.",
-    "Markets move toward the price where quantity demanded equals quantity supplied.",
-    "Shifts in demand or supply change the equilibrium price and quantity."
+    "A slope tells you how fast one quantity changes when another changes.",
+    "The derivative is the slope at a single point: the instantaneous rate of change.",
+    "In business, derivatives give marginal cost and show where profit peaks."
   ],
   "concepts": [
     {
       "id": "c1",
-      "name": "Law of demand",
-      "explanation": "Holding everything else constant, when the price of a good rises, the quantity buyers want falls. The demand curve slopes downward because higher prices push buyers toward substitutes and stretch their budgets.",
-      "pages": [3, 4],
-      "misconception": "Thinking a higher price lowers demand, when it lowers quantity demanded. The curve itself does not move.",
-      "bridge": "Raise ticket prices for a derby and fewer fans buy seats. Same fans, same love for the club, just fewer tickets at that price."
+      "name": "Slope of a straight line",
+      "explanation": "The slope of a line is rise over run: how much y changes for each one-unit increase in x. A negative slope means y falls as x grows. On a straight line the slope is the same everywhere.",
+      "pages": [2, 3],
+      "misconception": "Reading a steeper line as a bigger number even when it falls. A line dropping fast has a large negative slope, not a large positive one.",
+      "bridge": "A straight piste dropping 40 metres for every 100 metres you ski forward has slope -0.4, from the top lift to the bottom.",
+      "graph": {
+        "title": "A straight piste: height over distance",
+        "expression": "900 - 0.4*x",
+        "xMin": 0,
+        "xMax": 1500,
+        "xLabel": "distance (m)",
+        "yLabel": "height (m)",
+        "skier": true
+      }
     },
     {
       "id": "c2",
-      "name": "Law of supply",
-      "explanation": "Holding everything else constant, when the price of a good rises, sellers offer more of it. Higher prices make extra production profitable, so the supply curve slopes upward.",
-      "pages": [5],
-      "misconception": "Assuming supply means the amount actually sold, rather than what sellers are willing to offer at each price.",
-      "bridge": "If shirt sales pay more, your startup would print more shirts. Higher margin, more effort put into supplying."
+      "name": "Average rate of change",
+      "explanation": "The average rate of change of f between a and b is (f(b) - f(a)) / (b - a). It is the slope of the straight line joining the two points, and it ignores what happens in between.",
+      "pages": [4, 5],
+      "misconception": "Thinking the average rate tells you the rate at every point between a and b. It hides the steep and the flat parts.",
+      "bridge": "Your run drops 900 metres over 1600 metres. The average slope is the same whether the steep wall is at the top or the bottom.",
+      "graph": {
+        "title": "Real slopes are curved",
+        "expression": "450 + 450*cos(pi*x/1600)",
+        "xMin": 0,
+        "xMax": 1600,
+        "xLabel": "distance (m)",
+        "yLabel": "height (m)"
+      }
     },
     {
       "id": "c3",
-      "name": "Market equilibrium",
-      "explanation": "Equilibrium is the price where quantity demanded equals quantity supplied. At that price there is no pressure for the price to change, and the market clears.",
-      "pages": [6, 7],
-      "misconception": "Believing equilibrium is a fair or ideal price, rather than just the price where the two quantities match.",
-      "bridge": "Like a transfer fee that both clubs finally accept: not fair, just the point where buyer and seller stop moving."
+      "name": "The derivative",
+      "explanation": "The derivative f'(x) is the slope of the tangent line at x: the limit of the average rate of change as the interval shrinks to zero. It is the instantaneous rate of change at one point.",
+      "pages": [6, 7, 8],
+      "misconception": "Treating f'(x) as the value of the function. f(x) is the height; f'(x) is how steep it is right there.",
+      "bridge": "Height is where you are on the mountain. The derivative is how steep it is under your skis right now, and it changes as you go down.",
+      "graph": {
+        "title": "The slope under the skis",
+        "expression": "450 + 450*cos(pi*x/1600)",
+        "xMin": 0,
+        "xMax": 1600,
+        "xLabel": "distance (m)",
+        "yLabel": "height (m)",
+        "skier": true
+      }
     },
     {
       "id": "c4",
-      "name": "Shortage and surplus",
-      "explanation": "Below equilibrium, quantity demanded exceeds quantity supplied: a shortage, which pushes prices up. Above equilibrium, quantity supplied exceeds quantity demanded: a surplus, which pushes prices down.",
-      "pages": [8, 9],
-      "misconception": "Thinking a shortage means the good is rare, when it means the price is set too low.",
-      "bridge": "Final tickets sold too cheap sell out in minutes and touts appear. That's a shortage created by the price, not by the stadium."
+      "name": "Power rule",
+      "explanation": "For f(x) = x^n, the derivative is f'(x) = n x^(n-1). Constants drop out, and a constant factor stays in front. So 3x^2 + 5 has derivative 6x.",
+      "pages": [9, 10],
+      "misconception": "Lowering the power but forgetting to multiply by the old exponent, so x^3 becomes x^2 instead of 3x^2.",
+      "bridge": "Ski wax sales grow like x^2 over the season: the derivative 2x says sales pick up faster every week.",
+      "graph": {
+        "title": "y = x² and its tangent at x = 3",
+        "expression": "x^2",
+        "xMin": 0,
+        "xMax": 6,
+        "markX": 3
+      }
     },
     {
       "id": "c5",
-      "name": "Shift vs movement along a curve",
-      "explanation": "A change in the good's own price causes a movement along the curve. A change in anything else, like income, tastes or input costs, shifts the whole curve.",
-      "pages": [10, 11],
-      "misconception": "Saying a price change shifts the demand curve. Price only moves you along it.",
-      "bridge": "A star signing makes fans want more shirts at every price: the curve shifts. A discount just moves fans along the same curve."
+      "name": "Marginal cost",
+      "explanation": "Marginal cost C'(x) is the derivative of the cost function: roughly the extra cost of producing one more unit at output level x.",
+      "pages": [12, 13],
+      "misconception": "Confusing marginal cost with average cost. Average cost is C(x)/x; marginal cost is the slope of C at x.",
+      "bridge": "A ski-jacket maker at 100 jackets a day: marginal cost is what jacket number 101 adds to the bill.",
+      "graph": {
+        "title": "Cost of x ski jackets per day",
+        "expression": "2000 + 40*x + 0.05*x^2",
+        "xMin": 0,
+        "xMax": 300,
+        "xLabel": "jackets",
+        "yLabel": "cost (kr)",
+        "markX": 100
+      }
     },
     {
       "id": "c6",
-      "name": "Effects of a demand shift on equilibrium",
-      "explanation": "When demand increases with supply unchanged, both equilibrium price and quantity rise. When demand falls, both fall. The new equilibrium is where the new demand curve crosses supply.",
-      "pages": [12, 13],
-      "misconception": "Expecting price to rise but quantity to stay the same, forgetting sellers respond to the higher price.",
-      "bridge": "Your club reaches the final, demand for your merch jumps, you charge more and print more. Price and quantity rise together."
+      "name": "Maximum where the derivative is zero",
+      "explanation": "At the top of a smooth curve the tangent is flat, so f'(x) = 0. To find maximum profit, set P'(x) = 0 and solve, then check the slope changes from positive to negative.",
+      "pages": [15, 16],
+      "misconception": "Assuming every point with f'(x) = 0 is a maximum. It can also be a minimum or a flat point.",
+      "bridge": "A ski rental shop: more rentals bring more profit until staff and skis run out. The top of the profit hill is where the slope is zero.",
+      "graph": {
+        "title": "Daily profit from ski rentals",
+        "expression": "-0.5*x^2 + 200*x - 5000",
+        "xMin": 0,
+        "xMax": 400,
+        "xLabel": "rentals",
+        "yLabel": "profit (kr)",
+        "markX": 200
+      }
     }
   ]
 }

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MENTORS, type ConceptMap, type StudentProfile } from "@/lib/types";
+import { FileUp } from "lucide-react";
+import { MENTORS, UNIVERSITIES, type ConceptMap, type StudentProfile } from "@/lib/types";
+import CanvasPicker from "@/components/CanvasPicker";
+import { Arrow, InkUnderline, Pushpin } from "@/components/Ink";
 
 const PHASES = ["Reading", "Finding concepts", "Making it yours"];
 
@@ -10,14 +13,16 @@ type Props = {
   conceptMap: ConceptMap | null;
   onLoaded: (map: ConceptMap) => void;
   onStart: () => void;
+  onBack: () => void;
 };
 
-export default function Library({ profile, conceptMap, onLoaded, onStart }: Props) {
+export default function Library({ profile, conceptMap, onLoaded, onStart, onBack }: Props) {
   const accent = MENTORS[profile.mentor].accent;
   const [busy, setBusy] = useState(false);
   const [phase, setPhase] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [canvasOpen, setCanvasOpen] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // One request, so the progress line just walks forward on a timer.
@@ -30,7 +35,7 @@ export default function Library({ profile, conceptMap, onLoaded, onStart }: Prop
 
   const upload = async (file: File) => {
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setError("That's not a PDF.");
+      setError("That's not a PDF. Try a lecture PDF instead.");
       return;
     }
     setError(null);
@@ -50,132 +55,161 @@ export default function Library({ profile, conceptMap, onLoaded, onStart }: Prop
     }
   };
 
-  const importCanvas = async () => {
+  const importCanvas = async (src: string) => {
+    const res = await fetch(src);
+    if (!res.ok) throw new Error("not found");
+    const map = await res.json();
+    await new Promise((r) => setTimeout(r, 1200)); // let the import read as a real transfer
+    setCanvasOpen(false);
     setError(null);
-    try {
-      const res = await fetch("/demo/lecture.json");
-      onLoaded({ ...(await res.json()), source: "canvas" });
-    } catch {
-      setError("Could not load the Canvas lecture.");
-    }
+    onLoaded({ ...map, source: "canvas" });
   };
 
+  // The lesson is ready: it goes up on the board, like the session that follows.
   if (conceptMap && !busy) {
     return (
-      <div className="flex w-full max-w-2xl flex-col gap-8 py-10">
-        <header className="flex flex-col gap-2">
-          {conceptMap.source === "canvas" && (
-            <span className="w-fit rounded-full border border-white/15 px-2.5 py-0.5 text-xs text-white/50">From Canvas</span>
-          )}
-          <h1 className="text-2xl font-medium">{conceptMap.title}</h1>
-        </header>
+      <div className="classroom fixed inset-0 overflow-y-auto">
+        {/* Fetch the teacher's footage now, so he is on the board the moment the session opens. */}
+        <link rel="prefetch" href="/avatars/skier-talking.webm" />
+        <div className="mx-auto flex min-h-full w-full max-w-[860px] flex-col justify-center px-6 py-8">
+          <div className="board-frame relative">
+            <Pushpin accent={accent} />
+            <div className="board flex flex-col gap-7 p-7">
+              <header className="flex flex-col gap-3">
+                {conceptMap.source === "canvas" && (
+                  <span className="chalk-hand flex items-center gap-2 text-base text-[var(--chalk-dim)]">
+                    <img src="/logos/canvas.svg" alt="" className="h-5 w-5" />
+                    From Canvas
+                  </span>
+                )}
+                <h1 className="chalk-display chalk text-3xl leading-tight text-[var(--chalk)] [text-wrap:balance]">{conceptMap.title}</h1>
+              </header>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xs uppercase tracking-wider text-white/40">Main ideas</h2>
-          <ol className="flex flex-col gap-2">
-            {conceptMap.mainIdeas.map((idea, i) => (
-              <li key={i} className="flex gap-3 text-white/85">
-                <span style={{ color: accent }}>{i + 1}</span>
-                {idea}
-              </li>
-            ))}
-          </ol>
-        </section>
+              <section className="flex flex-col gap-3">
+                <h2 className="chalk-display text-lg text-[var(--chalk-yellow)]">Main ideas</h2>
+                <ol className="chalk-hand flex flex-col gap-2 text-[1.08rem] leading-snug text-[var(--chalk)]">
+                  {conceptMap.mainIdeas.map((idea, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span style={{ color: accent }}>{i + 1}.</span>
+                      {idea}
+                    </li>
+                  ))}
+                </ol>
+              </section>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xs uppercase tracking-wider text-white/40">Concepts</h2>
-          <ul className="flex flex-col divide-y divide-white/5 rounded-xl border border-white/10">
-            {conceptMap.concepts.map((c) => (
-              <li key={c.id} className="flex flex-col gap-1 px-4 py-3">
-                <div className="flex items-baseline justify-between gap-4">
-                  <span className="font-medium">{c.name}</span>
-                  <span className="shrink-0 text-xs text-white/35">p. {c.pages.join(", ")}</span>
-                </div>
-                <p className="text-sm text-white/55">
-                  <span style={{ color: accent }}>↳ </span>
-                  {c.bridge}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
+              <section className="flex flex-col gap-3">
+                <h2 className="chalk-display text-lg text-[var(--chalk-yellow)]">Concepts</h2>
+                <ul className="flex flex-col gap-3">
+                  {conceptMap.concepts.map((c) => (
+                    <li key={c.id} className="index-card flex flex-col gap-1 px-4 py-3 text-[#1f2a44]">
+                      <div className="flex items-baseline justify-between gap-4">
+                        <span className="chalk-display text-lg leading-tight">{c.name}</span>
+                        <span className="chalk-hand shrink-0 text-sm text-[#5b6474]">p. {c.pages.join(", ")}</span>
+                      </div>
+                      <p className="chalk-hand text-[0.98rem] leading-snug text-[#3d4760]">{c.bridge}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
 
-        <div className="flex items-center justify-between">
-          <button type="button" onClick={() => fileInput.current?.click()} className="text-sm text-white/50 hover:text-white">
-            Use another PDF
-          </button>
-          <button
-            type="button"
-            onClick={onStart}
-            className="rounded-full px-6 py-2.5 text-sm font-medium text-black"
-            style={{ background: accent }}
-          >
-            Start session
-          </button>
+              <footer className="flex flex-wrap items-end justify-between gap-4 text-[var(--chalk)]">
+                <button type="button" onClick={() => fileInput.current?.click()} className="ink-link is-back chalk-hand">
+                  Use another PDF
+                </button>
+                <button type="button" onClick={onStart} className="ink-link is-next chalk-hand">
+                  <span className="chalk inline-flex items-center gap-2">
+                    Start session
+                    <Arrow />
+                  </span>
+                  <InkUnderline />
+                </button>
+              </footer>
+              {error && <ErrorNote onBoard>{error}</ErrorNote>}
+              <HiddenInput inputRef={fileInput} onFile={upload} />
+            </div>
+          </div>
         </div>
-        <HiddenInput inputRef={fileInput} onFile={upload} />
-        {error && <p className="text-sm text-red-400">{error}</p>}
       </div>
     );
   }
 
+  const uni = profile.university ? UNIVERSITIES[profile.university] : null;
+  const from = uni && profile.university !== "other" ? uni.label : "your university";
+
   return (
-    <div className="flex w-full max-w-md flex-col gap-6">
-      <h1 className="text-2xl font-medium">What are you studying, {profile.firstName}?</h1>
+    <div className="classroom fixed inset-0 overflow-y-auto">
+      <div className="mx-auto flex min-h-full w-full max-w-[600px] flex-col justify-center px-6 py-8">
+        <div className="student-card relative flex flex-col">
+          <Pushpin accent={accent} />
+          <div className="flex flex-col gap-5 px-6 pt-5 pb-6">
+            <h1 className="chalk-display text-2xl leading-none text-[#1f2a44]">What are you studying, {profile.firstName}?</h1>
 
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => fileInput.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          const f = e.dataTransfer.files[0];
-          if (f) upload(f);
-        }}
-        className="flex h-48 flex-col items-center justify-center gap-2 rounded-xl border border-dashed transition-colors"
-        style={{ borderColor: dragging || busy ? accent : "rgb(255 255 255 / 0.15)", background: dragging ? `${accent}10` : "transparent" }}
-      >
-        {busy ? (
-          <>
-            <span className="text-base" style={{ color: accent }}>{PHASES[phase]}…</span>
-            <div className="mt-2 flex gap-1.5">
-              {PHASES.map((_, i) => (
-                <div key={i} className="h-0.5 w-10 rounded-full transition-colors" style={{ background: i <= phase ? accent : "rgb(255 255 255 / 0.1)" }} />
-              ))}
+            <button type="button" disabled={busy} onClick={() => setCanvasOpen(true)} className="canvas-import mt-3">
+              <img src="/logos/canvas.svg" alt="" className="h-11 w-11 shrink-0" />
+              <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left">
+                <span className="chalk-display text-[1.45rem] leading-tight">Import from Canvas</span>
+                <span className="chalk-hand text-base leading-tight text-[#4c5670]">Your course slides from {from}</span>
+              </span>
+              {profile.university === "uio" && <img src="/logos/uio.svg" alt="University of Oslo" className="uio-mark" />}
+              <Arrow />
+            </button>
+
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                const f = e.dataTransfer.files[0];
+                if (f && !busy) upload(f);
+              }}
+              className={`pdf-drop ${dragging ? "is-over" : ""} ${busy ? "is-busy" : ""}`}
+              style={{ "--hl": `${accent}40` } as React.CSSProperties}
+            >
+              {busy ? (
+                <div className="flex w-full flex-col items-center gap-2 py-1" role="status">
+                  <span className="chalk-hand text-lg">{PHASES[phase]}…</span>
+                  <div className="flex gap-1.5">
+                    {PHASES.map((_, i) => (
+                      <span key={i} className="h-[3px] w-12 rounded-full transition-colors duration-300" style={{ background: i <= phase ? "#2747a8" : "#9bb3d680" }} />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileInput.current?.click()} className="chalk-hand flex w-full items-center justify-center gap-2 py-1 text-[1.05rem] text-[#3d4760] hover:text-[#2747a8]">
+                  <FileUp size={17} strokeWidth={1.75} aria-hidden="true" />
+                  Or upload a lecture PDF
+                </button>
+              )}
             </div>
-          </>
-        ) : (
-          <>
-            <span className="text-base text-white/80">Drop your lecture PDF</span>
-            <span className="text-sm text-white/35">or click to choose</span>
-          </>
-        )}
-      </button>
 
-      <div className="flex items-center gap-3 text-xs text-white/30">
-        <div className="h-px flex-1 bg-white/10" />
-        or
-        <div className="h-px flex-1 bg-white/10" />
+            {error && <ErrorNote>{error}</ErrorNote>}
+
+            <div className="mt-3 flex text-[#1f2a44]">
+              <button type="button" disabled={busy} onClick={onBack} className="ink-link is-back chalk-hand">
+                <span className="inline-flex items-center gap-2">
+                  <Arrow back />
+                  Change mood
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <button
-        type="button"
-        disabled={busy}
-        onClick={importCanvas}
-        className="rounded-lg border border-white/10 py-3 text-sm text-white/70 transition-colors hover:border-white/25 hover:text-white disabled:opacity-30"
-      >
-        Import from Canvas
-      </button>
-
-      {error && <p className="text-sm text-red-400">{error}</p>}
       <HiddenInput inputRef={fileInput} onFile={upload} />
+      {canvasOpen && <CanvasPicker profile={profile} onClose={() => setCanvasOpen(false)} onPick={importCanvas} />}
     </div>
+  );
+}
+
+function ErrorNote({ onBoard, children }: { onBoard?: boolean; children: React.ReactNode }) {
+  return (
+    <p role="alert" className={`chalk-hand text-base ${onBoard ? "text-[#ffb4a8]" : "text-[#a92f2a]"}`}>
+      {children}
+    </p>
   );
 }
 

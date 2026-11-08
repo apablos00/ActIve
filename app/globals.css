@@ -274,6 +274,132 @@ body {
   background: rgb(241 238 228 / 0.06);
 }
 
+/* The chosen teacher steps forward; the others stay in chalk-dust grey. */
+.teacher-face {
+  opacity: 0.75;
+  transition: opacity 220ms ease-out, scale 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.teacher-pick:hover .teacher-face {
+  opacity: 0.92;
+}
+.teacher-pick.is-on .teacher-face {
+  opacity: 1;
+  scale: 1.08;
+}
+@media (prefers-reduced-motion: reduce) {
+  .teacher-face { transition: opacity 200ms ease-out; }
+  .teacher-pick.is-on .teacher-face { scale: 1; }
+}
+
+/* Moving between steps is written on the card, not pressed as a web button. */
+.ink-link {
+  position: relative;
+  display: inline-flex;
+  padding: 2px 2px 6px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: inherit;
+  cursor: pointer;
+  transition: color 180ms, opacity 180ms;
+}
+.ink-link.is-back {
+  font-size: 1.05rem;
+  font-weight: 400;
+  opacity: 0.72;
+}
+.ink-link.is-back:hover {
+  opacity: 1;
+}
+.student-card .ink-link:hover:not(:disabled) {
+  color: #2747a8;
+}
+.ink-link:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ink-underline {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  height: 6px;
+  overflow: visible;
+}
+.ink-arrow {
+  transition: translate 240ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ink-link.is-next:hover:not(:disabled) .ink-arrow {
+  translate: 4px 0;
+}
+.ink-link.is-back:hover .ink-arrow {
+  translate: -4px 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ink-arrow { transition: none; translate: none !important; }
+}
+
+/* Upload screen. The Canvas import is the main way in: a clean slip of paper
+   laid on the card. A PDF upload is the quieter pencilled-in alternative. */
+.canvas-import {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  color: #1f2a44;
+  background: #fffdf6;
+  border: 1.5px solid #1f2a44;
+  border-radius: 3px;
+  box-shadow: 0 6px 12px rgb(31 42 68 / 0.16), 0 1px 2px rgb(31 42 68 / 0.2);
+  cursor: pointer;
+  transition: translate 240ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 240ms cubic-bezier(0.16, 1, 0.3, 1), border-color 180ms, opacity 180ms;
+}
+.canvas-import:hover:not(:disabled) {
+  translate: 0 -2px;
+  border-color: #2747a8;
+  box-shadow: 0 10px 18px rgb(31 42 68 / 0.2), 0 2px 3px rgb(31 42 68 / 0.2);
+}
+.canvas-import:hover:not(:disabled) .ink-arrow {
+  translate: 4px 0;
+}
+.canvas-import:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.uio-mark {
+  height: 32px;
+  width: auto;
+  flex-shrink: 0;
+}
+@media (max-width: 560px) {
+  .uio-mark { display: none; }
+}
+.pdf-drop {
+  display: flex;
+  border: 1.5px dashed #9bb3d6;
+  border-radius: 3px;
+  padding: 8px 12px;
+  color: #1f2a44;
+  transition: background-color 180ms, border-color 180ms;
+}
+.pdf-drop:hover,
+.pdf-drop.is-over,
+.pdf-drop.is-busy {
+  border-color: #2747a8;
+}
+.pdf-drop.is-over {
+  background: var(--hl);
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-import { transition: border-color 180ms, opacity 180ms; }
+  .canvas-import:hover:not(:disabled) { translate: none; }
+}
+
+/* Year options swap softly when the level changes. */
+.fade-in {
+  animation: hand-in 220ms ease-out both;
+}
+
 .draw-in-fast {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
@@ -290,6 +416,9 @@ body {
 
 /* Options on the student card: handwritten, picked ones highlighted. */
 .card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1.5px solid #9bb3d6;
   border-radius: 999px;
   padding: 2px 12px 3px;
@@ -306,4 +435,83 @@ body {
   border-color: #1f2a44;
   background: var(--hl);
   font-weight: 700;
+}
+
+/* Each part of a step is written onto the card left to right, in the space it
+   has held from the start. Hidden parts stay out of the tab order. */
+.reveal-part {
+  visibility: hidden;
+  opacity: 0;
+  clip-path: inset(-12px 100% -12px -12px);
+}
+.reveal-part.is-in {
+  visibility: visible;
+  opacity: 1;
+  clip-path: inset(-12px);
+  transition: clip-path 620ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-part { clip-path: none; }
+  .reveal-part.is-in { clip-path: none; transition: opacity 200ms ease-out; }
+}
+
+/* Centre of the board: the teacher is drawn on the slate. The canvas fades
+   out at its edges and the board's grain sits on top, so there is no seam. */
+.board-stage > div:first-child {
+  -webkit-mask-image: radial-gradient(75% 80% at 50% 48%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(75% 80% at 50% 48%, #000 55%, transparent 100%);
+}
+.board-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Hand-drawn vertical line between the teacher and the notes. */
+.board-divider {
+  width: 2px;
+  margin: 28px 0;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, transparent, var(--chalk-faint) 8%, var(--chalk-faint) 92%, transparent);
+  filter: url(#chalk-rough);
+}
+
+/* Start: the one thing to press, breathing in the teacher's colour. */
+.start-btn {
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.35), 0 0 0 0 var(--glow);
+  animation: start-breathe 2.4s ease-in-out infinite;
+}
+@keyframes start-breathe {
+  50% { box-shadow: 0 2px 6px rgb(0 0 0 / 0.35), 0 0 22px 2px color-mix(in srgb, var(--glow) 55%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .start-btn { animation: none; }
+}
+
+/* Mock Canvas picker: its own plain LMS look, apart from the classroom. */
+.lms {
+  font-family: "Lato", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.lms-spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 3px solid #d7dbde;
+  border-top-color: #0b6fa4;
+  animation: lms-spin 800ms linear infinite;
+}
+.lms-spinner.is-light {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  border-color: rgb(255 255 255 / 0.35);
+  border-top-color: #fff;
+}
+@keyframes lms-spin {
+  to { rotate: 360deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lms-spinner { animation-duration: 2.4s; }
 }

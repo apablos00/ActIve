@@ -9,6 +9,9 @@ Back to [[00 Home]] · Prev: [[40 Mentor agent]] · Next: [[60 Summary and profe
 
 **Must-have 3 of 3.** A holographic mentor that comes alive with the ElevenLabs agent's voice. It moves the screen while it talks.
 
+## The ski racer (demo flow)
+Not a hologram. The Enthusiast (the demo mood) and the Stickler share a skier avatar: real talking footage cut out of its background (`public/avatars/skier-talking.*`, colour on top and mask below in each frame), waist-up from the first frame, on a transparent canvas over the real chalkboard (`components/SkierAvatar.tsx`). The footage plays while the agent's voice is present. When the voice stops it runs on to the next closed-mouth frame and rests there, breathing and blinking. His mouth follows the footage, not the agent's exact words. The other two teachers keep the 3D android hologram.
+
 ## The hologram
 A stylized, semi-transparent bust of the chosen mentor. It floats above a light projector disc.
 - **Look:** cyan glow in the mentor's accent color. Thin scanlines. Soft flicker. Particles rising from the disc.

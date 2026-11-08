@@ -21,8 +21,10 @@ const LLM = process.env.AGENT_LLM || "gemini-2.5-flash";
 const MENTORS = {
   stickler: {
     name: "Sparring Stickler",
-    firstMessage: "Good. {{student_name}}. Today: {{material_title}}. We'll be precise. Ready?",
-    voice: { gender: "female", ages: ["middle_aged", "middle aged", "old"] },
+    firstMessage: "Good afternoon, {{student_name}}. Today: {{material_title}}. I expect precise answers. Shall we begin?",
+    // Daniel: a steady British broadcaster. Crisp and exact, not warm.
+    voice: { id: "onwK4e9ZLuTAKqWW03F9", gender: "male", ages: ["middle_aged", "middle aged", "old"] },
+    tts: { stability: 0.72, similarity_boost: 0.85 },
   },
   chill: {
     name: "Sparring Chill One",
@@ -37,13 +39,17 @@ const MENTORS = {
   enthusiast: {
     name: "Sparring Enthusiast",
     firstMessage: "{{student_name}}! Oh, I love this one: {{material_title}}. Ready? Let's go!",
-    voice: { gender: "female", ages: ["young", "middle_aged", "middle aged"] },
+    // Charlie: deep, confident, energetic. Composed enough to sound formal, with real lift.
+    voice: { id: "IKne3meq5aSn9XLyUdCD", gender: "male", ages: ["young", "middle_aged", "middle aged"] },
+    tts: { stability: 0.5, similarity_boost: 0.85 },
   },
 };
 
 // Names must match the clientTools in components/Session.tsx.
 const str = (description) => ({ type: "string", description });
 const int = (description) => ({ type: "integer", description });
+const num = (description) => ({ type: "number", description });
+const bool = (description) => ({ type: "boolean", description });
 const TOOLS = [
   {
     name: "show_concept",
@@ -54,6 +60,22 @@ const TOOLS = [
     name: "show_question",
     description: "Show your current question as text on the student's screen.",
     properties: { text: str("The question, word for word") },
+  },
+  {
+    name: "draw_graph",
+    description:
+      "Draw a function graph in chalk on the student's board. Use it whenever a curve, slope or rate of change helps, e.g. a ski slope's height. Set skier to true for skiing examples: a skier rides the curve while the tangent and its slope are shown live.",
+    properties: {
+      expression: str('y as a function of x, e.g. "120 - 0.3*x^2". Use + - * / ^ ( ) and sqrt, exp, ln, sin, cos.'),
+      x_min: num("Left end of the x range"),
+      x_max: num("Right end of the x range"),
+      title: str("Short title written above the graph"),
+      x_label: str('x axis label, e.g. "distance (m)"'),
+      y_label: str('y axis label, e.g. "height (m)"'),
+      mark_x: num("Optional x where the tangent is drawn"),
+      skier: bool("true to show a skier riding the curve"),
+    },
+    required: ["expression", "x_min", "x_max"],
   },
   {
     name: "update_mastery",
@@ -108,14 +130,15 @@ function setEnv(key, value) {
 function placeholders() {
   const map = JSON.parse(readFileSync(join(ROOT, "public/demo/lecture.json"), "utf8"));
   return {
-    student_name: "Alex",
-    full_name: "Alex Hansen",
-    interests: "Economics, Political science",
-    hobbies: "Football, Gaming",
-    university: "University of Oslo",
-    programme: "Economics",
+    // The demo student.
+    student_name: "Markus",
+    full_name: "Markus Hansen",
+    interests: "Business and economics",
+    hobbies: "Skiing, Outdoors",
+    university: "BI Norwegian Business School",
+    programme: "Business management",
     year: "1st year Bachelor",
-    course: "Intro to Microeconomics",
+    course: "Mathematics",
     professor_name: "Professor Berg",
     material_title: map.title,
     main_ideas: map.mainIdeas.map((m, i) => `${i + 1}. ${m}`).join(" "),
@@ -145,6 +168,8 @@ function pickVoice(mentor, voices, taken) {
   const fromEnv = process.env[`ELEVENLABS_VOICE_${mentor.toUpperCase()}`];
   if (fromEnv) return { voice_id: fromEnv, name: "(from env)" };
   const want = MENTORS[mentor].voice;
+  const pinned = want.id && voices.find((v) => v.voice_id === want.id);
+  if (pinned) return { voice_id: pinned.voice_id, name: pinned.name };
   const free = voices.filter((v) => !taken.has(v.voice_id));
   const match =
     free.find((v) => v.labels?.gender === want.gender && want.ages.includes(v.labels?.age)) ??
@@ -188,7 +213,7 @@ for (const t of TOOLS) {
         name: t.name,
         description: t.description,
         expects_response: false,
-        parameters: { type: "object", properties: t.properties, required: Object.keys(t.properties) },
+        parameters: { type: "object", properties: t.properties, required: t.required ?? Object.keys(t.properties) },
       },
     });
     saved[t.name] = res.id;
@@ -202,7 +227,7 @@ setEnv("ELEVENLABS_TOOL_IDS", Object.entries(saved).map(([k, v]) => `${k}:${v}`)
 
 // 2. Agents: create or patch, then store the ID.
 const voices = await premadeVoices();
-const taken = new Set();
+const taken = new Set(Object.values(MENTORS).map((m) => m.voice.id).filter(Boolean)); // pinned voices stay unique
 const dynamicPlaceholders = placeholders();
 
 for (const mentor of mentors) {
@@ -219,7 +244,7 @@ for (const mentor of mentors) {
         prompt: { prompt: buildPrompt(mentor), llm: LLM, temperature: 0.5, tool_ids: toolIds },
         dynamic_variables: { dynamic_variable_placeholders: dynamicPlaceholders },
       },
-      tts: { model_id: "eleven_v3_conversational", expressive_mode: true, ...(voice && { voice_id: voice.voice_id }) },
+      tts: { model_id: "eleven_v3_conversational", expressive_mode: true, ...m.tts, ...(voice && { voice_id: voice.voice_id }) },
       turn: { turn_eagerness: "patient" },
     },
     platform_settings: { auth: { enable_auth: false } },

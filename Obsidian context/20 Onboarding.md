@@ -12,11 +12,13 @@ Back to [[00 Home]] · Prev: [[10 Setup]] · Next: [[30 Document processing]]
 ## Flow
 Three steps side by side on one page, styled like the classroom: steps 1-2 are paper student cards, step 3 is a small chalkboard. The current step is lifted and pinned; the others sit in shadow.
 Rule: anything with a known set of answers is a pick list (handwritten chips, highlighted when picked). Only truly free answers are text inputs, and they get a placeholder only when the answer is not obvious.
+Rule: each step shows one part at a time. Answering a part writes the next one onto the card, in space it has held from the start, so nothing moves. The step's button comes last. Saved profiles come back already written.
+Interest and hobby chips each carry a small line icon (`lucide-react`).
 1. **Get to know you.** Name, surname (text, no placeholder). Areas of interest and hobbies (pick any, 7-8 broad options each).
-2. **Your uni.** University (UiO, BI, OsloMet, Kristiania). Study programme (9 basic options). Level (Bachelor / Master / PhD). Year (1st-4th+). Course studying now (text, placeholder "For example, Statistics 1").
-3. **Your teacher.** Pick one of four teacher personalities.
+2. **Your uni.** University (UiO, BI, OsloMet, Kristiania, Other). Study programme (9 basic options). Level (Bachelor / Master). Year (Bachelor: 1st-3rd, Master: 4th-5th). Course studying now (text, placeholder "For example, Statistics 1").
+3. **Pick your mood.** One of four teacher personalities, each shown as a big chalk face. The Enthusiast comes first and is picked by default. Clicking a face goes straight to the upload screen.
 
-Then "Start with <teacher>" to `/library`. Choice lists live in `lib/types.ts`.
+Moving between steps is handwritten: "Continue" and "Back" links with a drawn arrow, no web-style buttons. Choice lists live in `lib/types.ts`.
 
 ## Data
 ```ts
@@ -25,10 +27,10 @@ type StudentProfile = {
   lastName: string;
   interests: string[];  // from INTERESTS
   hobbies: string[];    // from HOBBIES
-  university: "uio" | "bi" | "oslomet" | "kristiania" | "";
+  university: "uio" | "bi" | "oslomet" | "kristiania" | "other" | "";
   programme: string;    // from PROGRAMMES
-  level: string;        // Bachelor | Master | PhD
-  year: string;         // 1st | 2nd | 3rd | 4th+
+  level: string;        // Bachelor | Master
+  year: string;         // Bachelor: 1st | 2nd | 3rd. Master: 4th | 5th
   course: string;
   mentor: "stickler" | "chill" | "philosopher" | "enthusiast";
 };

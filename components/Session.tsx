@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import WritingHand from "@/components/WritingHand";
+import ChalkGraph from "@/components/ChalkGraph";
 import {
   ConversationProvider,
   useConversationControls,
@@ -10,7 +11,8 @@ import {
   useConversationMode,
   useConversationStatus,
 } from "@elevenlabs/react";
-import { MENTORS, UNIVERSITIES, type ConceptMap, type MentorId, type SessionResult, type StudentProfile } from "@/lib/types";
+import { MENTORS, UNIVERSITIES, type ConceptMap, type Graph, type MentorId, type SessionResult, type StudentProfile } from "@/lib/types";
+import { parseExpression } from "@/lib/graph";
 
 const Hologram = dynamic(() => import("@/components/Hologram"), { ssr: false });
 
@@ -56,6 +58,7 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
 
   const [conceptId, setConceptId] = useState<string | null>(null);
   const [question, setQuestion] = useState<string | null>(null);
+  const [drawnGraph, setDrawnGraph] = useState<Graph | null>(null); // from draw_graph
   const [mastery, setMastery] = useState<Record<string, Level>>({});
   const [flagged, setFlagged] = useState<string[]>([]);
   const [glitch, setGlitch] = useState(false);
@@ -102,12 +105,33 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
         if (concept_id && conceptMap.concepts.some((c) => c.id === concept_id)) {
           setConceptId(concept_id);
           setQuestion(null);
+          setDrawnGraph(null);
         }
         return "shown";
       },
       show_question: ({ text }: { text?: string }) => {
         if (text) setQuestion(text);
         return "shown";
+      },
+      draw_graph: (p: { expression?: string; x_min?: unknown; x_max?: unknown; title?: string; x_label?: string; y_label?: string; mark_x?: unknown; skier?: unknown }) => {
+        think();
+        const xMin = Number(p.x_min);
+        const xMax = Number(p.x_max);
+        if (!p.expression || !parseExpression(p.expression) || !(xMax > xMin)) {
+          return "Could not draw that. Use an expression in x like 100 - 0.5*x^2, and x_min < x_max.";
+        }
+        const markX = p.mark_x === undefined || p.mark_x === "" ? undefined : Number(p.mark_x);
+        setDrawnGraph({
+          expression: p.expression,
+          xMin,
+          xMax,
+          title: p.title || undefined,
+          xLabel: p.x_label || undefined,
+          yLabel: p.y_label || undefined,
+          markX: Number.isFinite(markX) ? markX : undefined,
+          skier: p.skier === true || p.skier === "true",
+        });
+        return "drawn on the board";
       },
       update_mastery: ({ concept_id, level }: { concept_id?: string; level?: number | string }) => {
         think();
@@ -158,12 +182,21 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
       return;
     }
     ended.current = false;
-    controls.startSession({
-      agentId,
-      dynamicVariables: dynamicVariables(profile, conceptMap),
-      clientTools,
-      onError: (msg: string) => setError(msg),
-    });
+    const connect = (connectionType?: "websocket") =>
+      controls.startSession({
+        agentId,
+        ...(connectionType && { connectionType }),
+        dynamicVariables: dynamicVariables(profile, conceptMap),
+        clientTools,
+        onError: (msg: string) => {
+          // WebRTC first fetches a token from the browser. When that request is
+          // blocked (extension, VPN, flaky network), retry once over WebSocket,
+          // which connects to public agents without a token.
+          if (!connectionType && msg.includes("conversation token")) return connect("websocket");
+          setError(msg);
+        },
+      });
+    connect();
   };
 
   const connected = status === "connected";
@@ -225,7 +258,7 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
     status === "connecting" ? "Connecting…" : connected ? (isSpeaking ? `${mentor.name} is speaking` : "Listening") : `${mentor.name} is ready`;
 
   return (
-    <div className={`classroom fixed inset-0 grid grid-cols-[272px_1fr_minmax(360px,420px)] grid-rows-[1fr_auto]`}>
+    <div className={`classroom fixed inset-0 grid grid-cols-[272px_1fr] grid-rows-[1fr_auto]`}>
 
       {/* Left: the lesson plan, one index card per concept */}
       <aside className="flex flex-col gap-3 overflow-y-auto px-5 pt-6 pb-8">
@@ -235,8 +268,11 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
         ))}
       </aside>
 
-      {/* Center: the hologram teacher */}
-      <section className="hologram-stage relative">
+      {/* One wide chalkboard: the teacher is drawn on the left, notes on the right. */}
+      <div className="flex min-h-0 py-6 pr-6">
+      <div className="board-frame flex min-h-0 flex-1">
+      <div className="board relative flex min-h-0 flex-1">
+      <section className="board-stage relative min-w-0 flex-1">
         <Hologram
           mentor={profile.mentor}
           accent={accent}
@@ -245,17 +281,20 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
           getInputVolume={controls.getInputVolume}
           glitch={glitch}
           celebrate={celebrate}
+          ski={profile.hobbies.includes("Skiing")}
         />
-        <div className="pointer-events-none absolute inset-x-0 top-6 flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em]" style={{ color: `${accent}cc` }}>
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent, boxShadow: connected ? `0 0 8px ${accent}` : "none", opacity: connected ? 1 : 0.4 }} />
+        <div className="chalk-hand pointer-events-none absolute inset-x-0 top-5 flex items-center justify-center gap-2 text-lg text-[var(--chalk-dim)]">
+          <span className="h-2 w-2 rounded-full" style={{ background: accent, boxShadow: connected ? `0 0 10px ${accent}` : "none", opacity: connected ? 1 : 0.4 }} />
           {stateLabel}
         </div>
       </section>
 
-      {/* Right: the chalkboard */}
-      <aside className="flex min-h-0 flex-col py-6 pr-6">
-        <div className="board-frame flex min-h-0 flex-1 flex-col">
-          <div className="board relative flex min-h-0 flex-1 flex-col gap-7 overflow-x-hidden overflow-y-auto p-7">
+      {/* A chalk line splits the board. */}
+      <span aria-hidden="true" className="board-divider" />
+
+      {/* Right half of the board: the notes */}
+      <aside className="flex min-h-0 w-[clamp(340px,30vw,420px)] shrink-0 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col gap-7 overflow-x-hidden overflow-y-auto p-7">
             {concept ? (
               <div key={concept.id} className="relative flex flex-col gap-4">
                 <span className="eraser-swipe" aria-hidden="true" />
@@ -285,6 +324,14 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
                   </span>
                   {speaking ? "stop talking" : "explain it to me"}
                 </button>
+                {(drawnGraph ?? concept.graph) && (
+                  <ChalkGraph
+                    key={JSON.stringify(drawnGraph ?? concept.graph)}
+                    graph={(drawnGraph ?? concept.graph)!}
+                    accent={accent}
+                    delay={drawnGraph ? 200 : 700 + (concept.name.length + concept.bridge.length) * CHALK_MS}
+                  />
+                )}
               </div>
             ) : (
               <p className="chalk-hand text-lg leading-snug text-[var(--chalk-ghost)]">
@@ -301,11 +348,21 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
               </div>
             )}
           </div>
-        </div>
       </aside>
+      </div>
+      </div>
+      </div>
 
-      {/* Bottom: the chalk ledge holding the controls */}
-      <footer className="ledge col-span-3 flex items-center gap-4 px-6 py-3.5">
+      {/* Bottom: the chalk ledge, controls in the middle */}
+      <footer className="ledge col-span-2 grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 py-3.5">
+        <div className="min-w-0">
+          {(error || (status === "error" && message)) && (
+            <span role="alert" className="text-sm text-[#ffb4a8]">
+              {error ?? message}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-center gap-3">
         {connected || status === "connecting" ? (
           <button type="button" onClick={stop} className="ledge-btn rounded-full px-6 py-2.5 text-sm">
             End session
@@ -314,9 +371,11 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
           <button
             type="button"
             onClick={start}
-            className="rounded-full bg-[var(--chalk)] px-7 py-2.5 text-sm font-semibold text-[#1d2a23] shadow-[0_2px_6px_rgb(0_0_0/0.35)] transition-transform hover:-translate-y-px"
+            className="start-btn flex items-center gap-2.5 rounded-full bg-[var(--chalk)] py-3 pr-9 pl-7 text-base font-semibold text-[#1d2a23] transition-transform hover:-translate-y-px"
+            style={{ "--glow": accent } as React.CSSProperties}
           >
-            Start
+            <MicIcon off={false} />
+            Start talking to {mentor.name}
           </button>
         )}
         {connected && (
@@ -345,17 +404,21 @@ function SessionView({ profile, conceptMap, onEnd }: Props) {
             }}
           />
         )}
-        {(error || (status === "error" && message)) && (
-          <span role="alert" className="text-sm text-[#ffb4a8]">
-            {error ?? message}
-          </span>
-        )}
-        <div className="ml-auto flex flex-wrap justify-end gap-2">
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {flagged.map((q, i) => (
             <span key={i} title={q} className="sticky-note chalk-hand px-3 py-1 text-sm" style={{ rotate: `${i % 2 ? 1.5 : -1.5}deg` }}>
               Sent to {PROFESSOR_NAME}
             </span>
           ))}
+          {/* Placeholder: the button is here for the demo. Silent mode itself isn't built yet. */}
+          <button type="button" className="ledge-btn flex items-center gap-3 rounded-2xl py-1.5 pr-4 pl-3 text-left">
+            <MicIcon off />
+            <span className="flex flex-col">
+              <span className="text-sm font-semibold leading-tight">Silent mode</span>
+              <span className="text-xs leading-tight text-[var(--chalk-dim)]">Can&apos;t talk? Listen and spot the mistakes</span>
+            </span>
+          </button>
         </div>
       </footer>
     </div>
@@ -376,7 +439,18 @@ function dynamicVariables(profile: StudentProfile, map: ConceptMap) {
     material_title: map.title,
     main_ideas: map.mainIdeas.map((m, i) => `${i + 1}. ${m}`).join(" "),
     concepts: map.concepts
-      .map((c) => [c.id, c.name, c.explanation, c.misconception, c.bridge, `p.${c.pages.join(",")}`].join(" | "))
+      .map((c) =>
+        [
+          c.id,
+          c.name,
+          c.explanation,
+          c.misconception,
+          c.bridge,
+          `p.${c.pages.join(",")}`,
+          // The board draws this graph when the concept opens.
+          ...(c.graph ? [`board graph: y = ${c.graph.expression}${c.graph.skier ? " (a skier rides it, slope shown live)" : ""}`] : []),
+        ].join(" | "),
+      )
       .join("\n"),
   };
 }
@@ -444,59 +518,6 @@ function ChalkText({ text, delay = 0, hand }: { text: string; delay?: number; ha
       </span>
       {writing && <WritingHand caret={caret} color={hand} tick={shown} />}
     </>
-  );
-}
-
-// The hologram teacher's hand, holding a real stick of chalk, following the
-// end of the line being written. Rendered in a portal so the board's
-// scroll area never clips it.
-function WritingHand({ caret, color, tick }: { caret: React.RefObject<HTMLSpanElement | null>; color: string; tick: number }) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  useLayoutEffect(() => {
-    const r = caret.current?.getBoundingClientRect();
-    if (r) setPos({ x: r.left, y: r.bottom });
-  }, [caret, tick]);
-  if (!pos) return null;
-  return createPortal(
-    <div className="writing-hand" style={{ left: pos.x, top: pos.y, color }} aria-hidden="true">
-      <svg viewBox="0 0 120 140" width="128" height="149">
-        <defs>
-          <filter id="holo-hand" x="-10%" y="-10%" width="120%" height="120%">
-            <feMorphology in="SourceGraphic" operator="erode" radius="1.3" result="inner" />
-            <feComposite in="SourceGraphic" in2="inner" operator="out" result="edge" />
-            <feComponentTransfer in="SourceGraphic" result="body">
-              <feFuncA type="linear" slope="0.2" />
-            </feComponentTransfer>
-            <feMerge>
-              <feMergeNode in="body" />
-              <feMergeNode in="edge" />
-            </feMerge>
-          </filter>
-          <pattern id="holo-scan" width="4" height="4" patternUnits="userSpaceOnUse">
-            <rect width="4" height="1" fill="currentColor" opacity="0.35" />
-          </pattern>
-        </defs>
-        {/* chalk stick: the one solid, physical thing */}
-        <line x1="5" y1="5" x2="33" y2="33" stroke="#f4f1e8" strokeWidth="7" strokeLinecap="round" />
-        <line x1="7" y1="5" x2="33" y2="31" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
-        {/* hologram hand */}
-        <g filter="url(#holo-hand)" stroke="currentColor" strokeLinecap="round" fill="currentColor">
-          <line x1="28" y1="22" x2="64" y2="48" strokeWidth="13" />
-          <line x1="22" y1="36" x2="52" y2="68" strokeWidth="12" />
-          <line x1="44" y1="58" x2="76" y2="82" strokeWidth="13" />
-          <line x1="52" y1="72" x2="82" y2="94" strokeWidth="13" />
-          <ellipse cx="74" cy="72" rx="24" ry="28" transform="rotate(-40 74 72)" stroke="none" />
-          <line x1="86" y1="98" x2="112" y2="128" strokeWidth="30" />
-        </g>
-        <g fill="url(#holo-scan)">
-          <ellipse cx="74" cy="72" rx="24" ry="28" transform="rotate(-40 74 72)" />
-          <line x1="86" y1="98" x2="112" y2="128" stroke="url(#holo-scan)" strokeWidth="30" strokeLinecap="round" />
-        </g>
-        {/* cuff */}
-        <line x1="80" y1="112" x2="102" y2="92" stroke="currentColor" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-      </svg>
-    </div>,
-    document.body,
   );
 }
 
